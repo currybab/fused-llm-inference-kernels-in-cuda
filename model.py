@@ -59,14 +59,10 @@ __device__ float block_reduce_max(float val, float* shared) {
 
     if (warp_id == 0) {
         val = lane < num_warps ? shared[lane] : -INFINITY;
-        val = warp_reduce_max(val);
-        if (lane == 0) {
-            shared[0] = val;
-        }
+        return warp_reduce_max(val);
     }
-    __syncthreads();
 
-    return shared[0];
+    return 0.0f;
 }
 
 # Step 5 - add_residual_kernel
@@ -137,8 +133,35 @@ __global__ void rmsnorm_kernel(const float* x, const float* weight, float* out, 
     }
 }
 
-# Step 10 - layernorm_kernel (not yet solved)
-# TODO: implement
+# Step 10 - layernorm_kernel
+__global__ void layernorm_kernel(const float* x, const float* weight, const float* bias, float* out, int n, float eps) {
+    // TODO: per-row LayerNorm using block_reduce_sum for mean and variance
+    int row = blockIdx.x;
+    int tid = threadIdx.x;
+    const float* x_row = x + (size_t)n * row;
+    float* out_row = out + (size_t)n * row;
+
+    float sum_1 = 0.0f;
+    float sum_sq = 0.0f;
+    for (int i = tid; i < n; i += blockDim.x) {
+        sum_1 += x_row[i];
+        sum_sq += x_row[i] * x_row[i];
+    }
+
+    __shared__ float shared1[32], shared2[32];
+    sum_1 = block_reduce_sum(sum_1, shared1);
+    sum_sq = block_reduce_sum(sum_sq, shared2);
+
+    __shared__ float mean, inv;
+    if (tid == 0) {
+        mean = sum_1 / n;
+        inv = rsqrtf(sum_sq / n - mean * mean + eps);
+    }
+    __syncthreads();
+    for (int i = tid; i < n; i += blockDim.x) {
+        out_row[i] = (x_row[i] - mean) * inv * weight[i] + bias[i];
+    }
+}
 
 # Step 11 - fused_add_rmsnorm_kernel (not yet solved)
 # TODO: implement
