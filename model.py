@@ -202,8 +202,45 @@ __global__ void fused_add_rmsnorm_kernel(
     }
 }
 
-# Step 12 - softmax_row_kernel (not yet solved)
-# TODO: implement
+# Step 12 - softmax_row_kernel
+__global__ void softmax_row_kernel(const float* x, float* out, int rows, int cols) {
+    // TODO: implement numerically stable row-wise softmax (one block per row)
+    int row = blockIdx.x;
+    int tid = threadIdx.x;
+
+    const float* x_row = x + (size_t)row * cols;
+    float* out_row = out + (size_t)row * cols;
+
+    float max = -INFINITY;
+    for (int i = tid; i < cols; i += blockDim.x) {
+        max = fmaxf(max, x_row[i]);
+    }
+
+    __shared__ float shared[32];
+    max = block_reduce_max(max, shared);
+    __shared__ float row_max;
+    if (tid == 0) {
+        row_max = max;
+    }
+    __syncthreads();
+
+    float sum = 0.0f;
+    for (int i = tid; i < cols; i += blockDim.x) {
+        sum += expf(x_row[i] - row_max);
+    }
+
+    sum = block_reduce_sum(sum, shared);
+    __shared__ float row_sum;
+    if (tid == 0) {
+        row_sum = sum;
+    }
+    __syncthreads();
+
+
+    for (int i = tid; i < cols; i += blockDim.x) {
+        out_row[i] = expf(x_row[i] - row_max) / row_sum;
+    }
+}
 
 # Step 13 - causal_softmax_kernel (not yet solved)
 # TODO: implement
