@@ -40,9 +40,12 @@ __device__ float block_reduce_sum(float val, float* shared) {
     if (warp_id == 0) {
         float v = (lane < num_warps) ? shared[lane] : 0.0f;
         v = warp_reduce_sum(v);
-        return v;
+        if (lane == 0) {
+            shared[0] = v;
+        }
     }
-    return 0.0f;
+    __syncthreads();
+    return shared[0];
 }
 
 # Step 4 - block_reduce_max
