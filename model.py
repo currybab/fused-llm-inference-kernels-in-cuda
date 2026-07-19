@@ -64,9 +64,13 @@ __device__ float block_reduce_max(float val, float* shared) {
     if (warp_id == 0) {
         val = lane < num_warps ? shared[lane] : -INFINITY;
         val = warp_reduce_max(val);
-        return val;
+        if (lane == 0) {
+            shared[0] = val;
+        }
     }
-    return 0.0f;
+    __syncthreads();
+
+    return shared[0];
 }
 
 # Step 5 - add_residual_kernel (not yet solved)
