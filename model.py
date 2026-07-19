@@ -39,13 +39,9 @@ __device__ float block_reduce_sum(float val, float* shared) {
     __syncthreads();
     if (warp_id == 0) {
         float v = (lane < num_warps) ? shared[lane] : 0.0f;
-        v = warp_reduce_sum(v);
-        if (lane == 0) {
-            shared[0] = v;
-        }
+        return warp_reduce_sum(v);
     }
-    __syncthreads();
-    return shared[0];
+    return 0.0f;
 }
 
 # Step 4 - block_reduce_max
@@ -115,8 +111,31 @@ __global__ void swiglu_kernel(const float* gate, const float* up, float* out, in
     }
 }
 
-# Step 9 - rmsnorm_kernel (not yet solved)
-# TODO: implement
+# Step 9 - rmsnorm_kernel
+__global__ void rmsnorm_kernel(const float* x, const float* weight, float* out, int n, float eps) {
+    // TODO: Apply RMSNorm per row (one block per row)
+    int row = blockIdx.x;
+    int tid = threadIdx.x;
+    const float* x_row = x + (size_t)blockIdx.x * n;
+    float* out_row = out + (size_t)blockIdx.x * n;
+
+    float sum_sq = 0.0f;
+    for (int i = tid; i < n; i += blockDim.x) {
+        sum_sq += x_row[i] * x_row[i];
+    }
+    __shared__ float shared[32];
+    sum_sq = block_reduce_sum(sum_sq, shared);
+
+    __shared__ float inv;
+    if (tid == 0) {
+        inv = rsqrtf(sum_sq / n + eps);
+    }
+    __syncthreads();
+    
+    for (int i = tid; i < n; i += blockDim.x) {
+        out_row[i] = x_row[i] * inv * weight[i];
+    }
+}
 
 # Step 10 - layernorm_kernel (not yet solved)
 # TODO: implement
