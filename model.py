@@ -346,8 +346,23 @@ __global__ void linear_kernel(const float* x, const float* weight,
     out[tid] = sum;
 }
 
-# Step 17 - fused_linear_bias_gelu_kernel (not yet solved)
-# TODO: implement
+# Step 17 - fused_linear_bias_gelu_kernel
+__global__ void fused_linear_bias_gelu_kernel(
+    const float* x, const float* weight, const float* bias,
+    float* out, int M, int N, int K) {
+    // TODO: fuse matmul, bias add, and GELU tanh approx into one kernel
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= M * N) return;
+    int m = tid / N, n = tid % N;
+    const float* x_row = x + m * K;
+    const float* weight_col = weight + n * K;
+    float v = (bias != nullptr) ? bias[n] : 0.0f;
+    for (int i = 0; i < K; i++) {
+        v += x_row[i] * weight_col[i];
+    } 
+
+    out[tid] = 0.5 * v * (1 + tanhf(sqrtf(2.0f / M_PI) * (v + 0.044715 * v * v * v)));
+}
 
 # Step 18 - mlp_swiglu_forward (not yet solved)
 # TODO: implement
