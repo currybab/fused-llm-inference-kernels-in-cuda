@@ -296,8 +296,36 @@ __global__ void embedding_lookup_kernel(const int* token_ids, const float* weigh
     }
 }
 
-# Step 15 - rope_kernel (not yet solved)
-# TODO: implement
+# Step 15 - rope_kernel
+__global__ void rope_kernel(float* q, float* k,
+                            const float* cos_table, const float* sin_table,
+                            int seq_len, int n_heads, int head_dim) {
+    // TODO: apply RoPE rotation in-place to every even/odd pair of q and k
+    int half = head_dim / 2;
+    int total = seq_len * n_heads * half;
+    int tid = threadIdx.x + blockDim.x * blockIdx.x;
+    if (tid < total) {
+        int i = tid % half;
+        int h = (tid / half) % n_heads;
+        int t = (tid / half / n_heads) % seq_len;
+
+        int base = (t * n_heads + h) * head_dim;
+        int even = base + 2 * i;
+        int odd = even + 1;
+        float cos = cos_table[t * half + i];
+        float sin = sin_table[t * half + i];
+
+        float q0 = q[even];
+        float q1 = q[odd];
+        float k0 = k[even];
+        float k1 = k[odd];
+
+        q[even] = q0 * cos - q1 * sin;
+        q[odd] = q0 * sin + q1 * cos; 
+        k[even] = k0 * cos - k1 * sin;
+        k[odd] = k0 * sin + k1 * cos; 
+    }
+}
 
 # Step 16 - linear_kernel (not yet solved)
 # TODO: implement
