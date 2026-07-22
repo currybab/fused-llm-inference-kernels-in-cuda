@@ -327,8 +327,24 @@ __global__ void rope_kernel(float* q, float* k,
     }
 }
 
-# Step 16 - linear_kernel (not yet solved)
-# TODO: implement
+# Step 16 - linear_kernel
+__global__ void linear_kernel(const float* x, const float* weight,
+                              const float* bias, float* out,
+                              int M, int N, int K) {
+    // TODO: compute out = x @ weight^T (+ bias if non-null)
+    // x: [M*K], weight: [N*K], bias: [N] or nullptr, out: [M*N]
+    int tid = blockIdx.x * blockDim.x + threadIdx.x;
+    if (tid >= M * N) return;
+    int m = tid / N, n = tid % N;
+    const float* x_row = x + m * K;
+    const float* weight_col = weight + n * K;
+    float sum = (bias != nullptr) ? bias[n] : 0.0f;
+    for (int i = 0; i < K; i++) {
+        sum += x_row[i] * weight_col[i];
+    } 
+
+    out[tid] = sum;
+}
 
 # Step 17 - fused_linear_bias_gelu_kernel (not yet solved)
 # TODO: implement
