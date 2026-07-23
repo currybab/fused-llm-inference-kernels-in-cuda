@@ -375,13 +375,16 @@ void mlp_swiglu_forward(const float* x, const float* w_gate, const float* w_up,
     const int threads = 256;
     float *d_gate, *d_up, *d_act;
     cudaMalloc(&d_gate, M * intermediate_dim * sizeof(float));
-    cudaMalloc(&d_up,   M * intermediate_dim * sizeof(float));
-    cudaMalloc(&d_act,  M * intermediate_dim * sizeof(float));
+    cudaMalloc(&d_up, M * intermediate_dim * sizeof(float));
+    cudaMalloc(&d_act, M * intermediate_dim * sizeof(float));
     
-    linear_kernel<<<(M * intermediate_dim + threads - 1) / threads, threads>>>(x, w_gate, nullptr, d_gate, M, intermediate_dim, hidden_dim);
-    linear_kernel<<<(M * intermediate_dim + threads - 1) / threads, threads>>>(x, w_up, nullptr, d_up, M, intermediate_dim, hidden_dim);
-    swiglu_kernel<<<(M * intermediate_dim + threads - 1) / threads, threads>>>(d_gate, d_up, d_act, M * intermediate_dim);
-    linear_kernel<<<(M * hidden_dim + threads - 1) / threads, threads>>>(d_act, w_down, nullptr, out, M, hidden_dim, intermediate_dim);
+    int blocks = (M * intermediate_dim + threads - 1) / threads;
+    linear_kernel<<<blocks, threads>>>(x, w_gate, nullptr, d_gate, M, intermediate_dim, hidden_dim);
+    linear_kernel<<<blocks, threads>>>(x, w_up, nullptr, d_up, M, intermediate_dim, hidden_dim);
+    swiglu_kernel<<<blocks, threads>>>(d_gate, d_up, d_act, M * intermediate_dim);
+    
+    blocks = (M * hidden_dim + threads - 1) / threads;
+    linear_kernel<<<blocks, threads>>>(d_act, w_down, nullptr, out, M, hidden_dim, intermediate_dim);
     cudaDeviceSynchronize();
     cudaFree(d_gate);
     cudaFree(d_up);
