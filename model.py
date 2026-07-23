@@ -364,8 +364,29 @@ __global__ void fused_linear_bias_gelu_kernel(
     out[tid] = 0.5 * v * (1 + tanhf(sqrtf(2.0f / M_PI) * (v + 0.044715 * v * v * v)));
 }
 
-# Step 18 - mlp_swiglu_forward (not yet solved)
-# TODO: implement
+# Step 18 - mlp_swiglu_forward
+void mlp_swiglu_forward(const float* x, const float* w_gate, const float* w_up,
+                        const float* w_down, float* out,
+                        int M, int hidden_dim, int intermediate_dim) {
+    // TODO: allocate temps, run gate/up linears, swiglu, then down projection
+    (void)x; (void)w_gate; (void)w_up; (void)w_down; (void)out;
+    (void)M; (void)hidden_dim; (void)intermediate_dim;
+
+    const int threads = 256;
+    float *d_gate, *d_up, *d_act;
+    cudaMalloc(&d_gate, M * intermediate_dim * sizeof(float));
+    cudaMalloc(&d_up,   M * intermediate_dim * sizeof(float));
+    cudaMalloc(&d_act,  M * intermediate_dim * sizeof(float));
+    
+    linear_kernel<<<(M * intermediate_dim + threads - 1) / threads, threads>>>(x, w_gate, nullptr, d_gate, M, intermediate_dim, hidden_dim);
+    linear_kernel<<<(M * intermediate_dim + threads - 1) / threads, threads>>>(x, w_up, nullptr, d_up, M, intermediate_dim, hidden_dim);
+    swiglu_kernel<<<(M * intermediate_dim + threads - 1) / threads, threads>>>(d_gate, d_up, d_act, M * intermediate_dim);
+    linear_kernel<<<(M * hidden_dim + threads - 1) / threads, threads>>>(d_act, w_down, nullptr, out, M, hidden_dim, intermediate_dim);
+    cudaDeviceSynchronize();
+    cudaFree(d_gate);
+    cudaFree(d_up);
+    cudaFree(d_act);
+}
 
 # Step 19 - rmsnorm_residual_block (not yet solved)
 # TODO: implement
