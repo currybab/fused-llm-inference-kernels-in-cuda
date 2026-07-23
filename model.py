@@ -391,8 +391,24 @@ void mlp_swiglu_forward(const float* x, const float* w_gate, const float* w_up,
     cudaFree(d_act);
 }
 
-# Step 19 - rmsnorm_residual_block (not yet solved)
-# TODO: implement
+# Step 19 - rmsnorm_residual_block
+void rmsnorm_residual_block(
+    const float* x,
+    const float* residual,
+    const float* weight,
+    float* out,
+    float* residual_out,
+    int rows,
+    int n,
+    float eps
+) {
+    // TODO: launch fused_add_rmsnorm_kernel for the pre-norm residual+RMSNorm block
+    const int threads = 256;
+    
+    int blocks = (rows * n + threads - 1) / threads;
+    add_residual_kernel<<<blocks, threads>>>(x, residual, residual_out, rows * n);
+    rmsnorm_kernel<<<rows, threads>>>(residual_out, weight, out, n, eps);
+}
 
 # Step 20 - run_transformer_ffn (not yet solved)
 # TODO: implement
