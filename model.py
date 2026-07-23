@@ -410,6 +410,27 @@ void rmsnorm_residual_block(
     rmsnorm_kernel<<<rows, threads>>>(residual_out, weight, out, n, eps);
 }
 
-# Step 20 - run_transformer_ffn (not yet solved)
-# TODO: implement
+# Step 20 - run_transformer_ffn
+void run_transformer_ffn(const float* x, const float* residual,
+                         const float* norm_weight, const float* w_gate,
+                         const float* w_up, const float* w_down, float* out,
+                         int M, int hidden_dim, int intermediate_dim,
+                         float eps) {
+  // TODO: residual+RMSNorm, SwiGLU MLP, then residual add into out
+  float *residual_out, *block_out;
+  int n = M * hidden_dim;
+  cudaMalloc(&residual_out, n * sizeof(float));
+  cudaMalloc(&block_out, n * sizeof(float));
+
+  rmsnorm_residual_block(x, residual, norm_weight, block_out, residual_out, M, hidden_dim, eps);
+  mlp_swiglu_forward(block_out, w_gate, w_up, w_down, out, M, hidden_dim, intermediate_dim);
+
+
+  const int threads = 256;
+  int blocks = (n + threads - 1) / threads;
+  add_residual_kernel<<<blocks, threads>>>(residual_out, out, out, n);
+  cudaDeviceSynchronize();
+  cudaFree(residual_out);
+  cudaFree(block_out);
+}
 
